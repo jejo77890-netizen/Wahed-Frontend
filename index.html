@@ -4,88 +4,72 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F-Lambda Transformer</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background-color: #0a0a23;
-        color: #fff;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-    }
-    input, button, textarea {
-        margin: 10px 0;
-        padding: 10px;
-        border-radius: 6px;
-        border: none;
-    }
-    button {
-        background-color: #4f46e5;
-        color: white;
-        cursor: pointer;
-    }
-    button:disabled {
-        background-color: #777;
-        cursor: not-allowed;
-    }
-    #result {
-        margin-top: 20px;
-        max-width: 90%;
-        word-break: break-word;
-    }
+body { font-family: Arial, sans-serif; background: #0b0c17; color: #fff; padding: 20px; }
+input, textarea, button { font-size: 14px; margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: none; }
+button { background: #4f46e5; color: #fff; cursor: pointer; }
+img, video, audio { max-width: 100%; margin-top: 10px; border-radius: 10px; }
 </style>
 </head>
 <body>
-<h1>F-Lambda Transformer</h1>
+<div id="root"></div>
 
-<input type="file" id="fileInput">
-<button id="uploadBtn">Upload & Transform</button>
-<div id="progress"></div>
-<div id="result"></div>
+<script type="text/babel">
+const { useState } = React;
 
-<script>
-const uploadBtn = document.getElementById('uploadBtn');
-const fileInput = document.getElementById('fileInput');
-const resultDiv = document.getElementById('result');
-const progressDiv = document.getElementById('progress');
+function App() {
+    const [file, setFile] = useState(null);
+    const [result, setResult] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-uploadBtn.addEventListener('click', async () => {
-    const file = fileInput.files[0];
-    if (!file) {
-        alert('Please select a file.');
-        return;
-    }
+    const API_URL = "https://wahed-backend.onrender.com"; 
 
-    const formData = new FormData();
-    formData.append('file', file);
+    const handleUpload = async () => {
+        if (!file) return alert("Select a file first");
+        setLoading(true);
+        try {
+            let formData = new FormData();
+            formData.append("file", file);
 
-    progressDiv.innerText = 'Processing...';
+            const response = await fetch(API_URL, { method: "POST", body: formData });
+            if (!response.ok) throw new Error("Upload failed");
+            const data = await response.json();
+            setResult(data);
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    try {
-        const response = await fetch('https://wahed-backend.onrender.com', {
-            method: 'POST',
-            body: formData
-        });
+    return (
+        <div>
+            <h1>F-Lambda Transformer</h1>
+            <input type="file" onChange={e => setFile(e.target.files[0])} />
+            <button onClick={handleUpload} disabled={loading}>{loading ? "Processing..." : "Upload & Transform"}</button>
 
-        if (!response.ok) throw new Error('Upload failed');
+            {result && (
+                <div>
+                    <h3>File Info:</h3>
+                    <p>Name: {result.filename}</p>
+                    <p>Type: {result.content_type}</p>
+                    <p>Size: {result.size_bytes} bytes</p>
+                    <p>Processing Time: {result.processing_time}</p>
+                    
+                    {result.content_type.startsWith("image") && <img src={`data:${result.content_type};base64,${result.recovered_file}`} />}
+                    {result.content_type.startsWith("video") && <video controls src={`data:${result.content_type};base64,${result.recovered_file}`} />}
+                    {result.content_type.startsWith("audio") && <audio controls src={`data:${result.content_type};base64,${result.recovered_file}`} />}
+                    {result.content_type.startsWith("text") && <pre>{atob(result.recovered_file)}</pre>}
+                </div>
+            )}
+        </div>
+    );
+}
 
-        const data = await response.json();
-        progressDiv.innerText = 'Done!';
-
-        resultDiv.innerHTML = `
-            <p>Filename: ${data.filename}</p>
-            <p>Content type: ${data.content_type}</p>
-            <p>Size (bytes): ${data.size_bytes}</p>
-            <p>Processing time: ${data.processing_time}</p>
-            <p>Signals count: ${data.signals_count}</p>
-            <p>Base64 preview (first 200 chars): ${data.recovered_file.slice(0, 200)}</p>
-        `;
-    } catch (err) {
-        progressDiv.innerText = '';
-        alert(err.message);
-    }
-});
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
